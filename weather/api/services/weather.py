@@ -20,7 +20,7 @@ def get_time(sheet):
 
 def get_cloud_interpolated_data(sheet):
     cloud_number = np.array(
-        [elem.value if elem.value else np.nan for elem in sheet["N"][1: sheet.max_row]]
+        [elem.value if elem.value else np.nan for elem in sheet["N"][1: sheet.roww]]
     )
     not_nan = np.logical_not(np.isnan(cloud_number))
     indices = np.arange(len(cloud_number))
@@ -41,7 +41,6 @@ def get_wind_interpolated_data(sheet):
         "Восточный": 7,
         "С-В": 8,
         "Северный": 9,
-        "without": None
     }
 
     storage_2 = {val: key for key, val in storage.items()}
@@ -49,19 +48,19 @@ def get_wind_interpolated_data(sheet):
     wind = np.array(
         [
             storage[elem.value] if elem.value else np.nan
-            for elem in sheet["D"][1: sheet.max_row]
+            for elem in sheet["D"][1: sheet.roww]
         ]
     )
     not_nan = np.logical_not(np.isnan(wind))
     indices = np.arange(len(wind))
     interp = interp1d(indices[not_nan], wind[not_nan],
                       fill_value="extrapolate")
-    return [storage_2.get(int(round(elem))) if storage_2.get(int(round(elem))) else storage_2[None] for elem in interp(indices)]
+    return [storage_2.get(int(round(elem)), "С-З") for elem in interp(indices)]
 
 
 def get_wind_speed_interpolated_data(sheet):
     temp = np.array(
-        [elem.value if elem else np.nan for elem in sheet["E"][1: sheet.max_row]]
+        [elem.value if elem else np.nan for elem in sheet["E"][1: sheet.roww]]
     )
 
     not_nan = np.logical_not(np.isnan(temp))
@@ -107,7 +106,7 @@ def get_weather_interpolated_data(sheet):
     weather = np.array(
         [
             storage[elem.value] if elem.value else np.nan
-            for elem in sheet["F"][1: sheet.max_row]
+            for elem in sheet["F"][1: sheet.roww]
         ]
     )
 
@@ -115,12 +114,12 @@ def get_weather_interpolated_data(sheet):
     indices = np.arange(len(weather))
     interp = interp1d(indices[not_nan],
                       weather[not_nan], fill_value="extrapolate")
-    return [storage_2.get(int(round(elem))) if storage_2.get(int(round(elem))) else storage_2[23] for elem in interp(indices)]
+    return [storage_2.get(int(round(elem)), "DZ") for elem in interp(indices)]
 
 
 def get_temperature_interpolated_data(sheet):
     temp = np.array(
-        [elem.value if elem else np.nan for elem in sheet["C"][1: sheet.max_row]]
+        [elem.value if elem else np.nan for elem in sheet["C"][1: sheet.roww]]
     )
 
     not_nan = np.array([bool(elem) for elem in temp])
@@ -140,7 +139,7 @@ def create_database(filename):
         cur.execute(f'''CREATE TABLE {filename}
 			   (day NUMERIC, time varchar, temperature NUMERIC,
 			   wind_direction varchar, wind_speed NUMERIC,
-			   weather_kod varchar, cloud_number NUMERIC)''')
+			   weather_kod varchar)''')
 
         # Save (commit) the changes
     except Exception as ex:
@@ -164,7 +163,7 @@ def check_if_table_exists(cursor, filename):
         return False
 
 
-def insert_data(filename, sheet, days, times, temperaturas, wind_directions, wind_speeds, weather_kods, cloudss):
+def insert_data(filename, sheet, days, times, temperaturas, wind_directions, wind_speeds, weather_kods):
 
     con = sqlite3.connect("db.sqlite3")
     cur = con.cursor()
@@ -175,10 +174,10 @@ def insert_data(filename, sheet, days, times, temperaturas, wind_directions, win
         cur.execute(f"""DELETE from {filename} """)
 
     try:
-        for i in range(sheet.max_row-1):
+        for i in range(sheet.roww-1):
             cur.execute(
                     f"""INSERT INTO {filename} VALUES ({days[i]},{times[i]},{temperaturas[i]},
-				'{wind_directions[i]}', {wind_speeds[i]}, '{weather_kods[i]}', {cloudss[i]})""")
+				'{wind_directions[i]}', {wind_speeds[i]}, '{weather_kods[i]}')""")
             con.commit()
     except Exception as ex:
         print(ex)

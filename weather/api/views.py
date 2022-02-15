@@ -1,6 +1,7 @@
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
 from openpyxl import load_workbook
 import numpy as np
 import sys
@@ -9,7 +10,6 @@ from weather.models import UsedFiles
 from .serializers import UsedFilesSerializer
 
 from .services.weather import (
-    get_cloud_interpolated_data,
     get_day, get_time,
     get_temperature_interpolated_data,
     get_weather_interpolated_data,
@@ -38,22 +38,23 @@ class WeatherViewView(APIView):
     def post(self, request):
 
         workbook = request.FILES.get("file_for_db")
-        filename = request.data["file_name"].replace("-", "_")
-        # filell = BytesIO(workbook.seek(0))
+        filename: str = request.data["file_name"].replace("-", "_")
+        if not filename.split(".")[1] == "xlsx":
+            return Response({"error": "this type is not supported"}, status=status.HTTP_400_BAD_REQUEST)
         with open(os.path.join(settings.BASE_DIR, f"exels/{filename}"), "wb+") as f:
             for chunk in workbook.chunks():
                 f.write(chunk)
         workbook = load_workbook(filename=f"exels/{filename}")
         sheet = workbook.active
+        sheet.roww = sheet.max_row - 28
         day = get_day(sheet)
         time = get_time(sheet)
         temperatura = get_temperature_interpolated_data(sheet)
         wind_direction = get_wind_interpolated_data(sheet)
         wind_speed = get_wind_speed_interpolated_data(sheet)
         weather_kod = get_weather_interpolated_data(sheet)
-        clouds = get_cloud_interpolated_data(sheet)
 
-        return Response(insert_data(filename.split(".")[0], sheet, day, time, temperatura, wind_direction, wind_speed, weather_kod, clouds))
+        return Response(insert_data(filename.split(".")[0], sheet, day, time, temperatura, wind_direction, wind_speed, weather_kod))
 
     # serializer = ProductPostSerializer(data=request.data)
     # if serializer.is_valid():
